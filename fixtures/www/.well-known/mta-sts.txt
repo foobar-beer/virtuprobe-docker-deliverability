@@ -1,0 +1,4 @@
+version: STSv1
+mode: enforce
+mx: mail.good.mail.test
+max_age: 604800

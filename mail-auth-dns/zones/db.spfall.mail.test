@@ -1,0 +1,33 @@
+; spfall.mail.test
+;
+; A single fault, isolated: SPF that authorizes the entire internet. Present as its own domain so
+; a chain can assert on the qualifier without any other finding in the way.
+;
+; Addresses come from the RFC 5737 documentation range and the domain is under .test, which
+; RFC 2606 reserves, so nothing here can route anywhere real.
+
+$ORIGIN spfall.mail.test.
+$TTL 60
+
+@       IN  SOA  ns1.spfall.mail.test. admin.spfall.mail.test. (
+                 2026092401 ; serial
+                 3600       ; refresh
+                 900        ; retry
+                 604800     ; expire
+                 60 )       ; minimum
+
+@       IN  NS   ns1.spfall.mail.test.
+ns1     IN  A    127.0.0.1
+
+@       IN  A    192.0.2.50
+mail    IN  A    192.0.2.51
+@       IN  MX   10 mail.spfall.mail.test.
+
+; +all passes every sender, so the record is worse than no record: it tells a receiver that the
+; whole internet is authorized, and a checker looking only for "does an SPF record exist" reports
+; the domain protected.
+@       IN  TXT  "v=spf1 +all"
+
+; ?all on a subdomain, the quieter version of the same thing. Neutral is treated as no policy at
+; all by most receivers, so it is worth a separate finding from ~all softfail.
+neutral IN  TXT  "v=spf1 ip4:192.0.2.51 ?all"

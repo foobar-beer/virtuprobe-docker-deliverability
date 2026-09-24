@@ -1,0 +1,63 @@
+# Listening on 5353 rather than 53, and the reason is not cosmetic.
+#
+# A VPN with DNS-leak protection blocks outbound port 53 on every interface except its own tunnel,
+# which is correct behavior for a VPN and is what most people run. That block applies to the docker
+# bridge too, so a container listening on 53 is unreachable from the host: the published port
+# accepts, docker-proxy tries to relay to container:53, and nothing arrives. The symptom is that
+# public resolvers on 53 answer fine, because they go through the tunnel, while this target times
+# out. Moving it to 5353 fixes it with no change to the VPN and no DNS leaking.
+#
+# The published host port is 11053, so nothing that talks to this target notices.
+
+good.mail.test:5353 {
+    file /etc/coredns/zones/db.good.mail.test
+    log
+    errors
+}
+
+weak.mail.test:5353 {
+    file /etc/coredns/zones/db.weak.mail.test
+    log
+    errors
+}
+
+broken.mail.test:5353 {
+    file /etc/coredns/zones/db.broken.mail.test
+    log
+    errors
+}
+
+nospf.mail.test:5353 {
+    file /etc/coredns/zones/db.nospf.mail.test
+    log
+    errors
+}
+
+spfall.mail.test:5353 {
+    file /etc/coredns/zones/db.spfall.mail.test
+    log
+    errors
+}
+
+bl.mail.test:5353 {
+    file /etc/coredns/zones/db.bl.mail.test
+    log
+    errors
+}
+
+# The reverse zone, for forward-confirmed reverse DNS.
+2.0.192.in-addr.arpa:5353 {
+    file /etc/coredns/zones/db.2.0.192.in-addr.arpa
+    log
+    errors
+}
+
+# Everything else is forwarded, so the same resolver can be pointed at a real domain without
+# swapping it out. That matters for the audit chains: the only thing that changes between auditing
+# a fixture and auditing your own domain is the {{domain}} variable.
+.:5353 {
+    forward . 8.8.8.8 8.8.4.4
+    log
+    errors
+    cache 30
+}

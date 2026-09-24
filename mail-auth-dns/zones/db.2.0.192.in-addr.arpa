@@ -1,0 +1,34 @@
+; 2.0.192.in-addr.arpa
+;
+; The reverse zone, which is what makes forward-confirmed reverse DNS demonstrable. Gmail and Yahoo
+; both require a sending IP to have a PTR that resolves, and for the name it resolves to to point
+; back at the same address. Two of the three fixtures below break that in different ways, and only
+; the round trip tells them apart.
+
+$ORIGIN 2.0.192.in-addr.arpa.
+$TTL 60
+
+@       IN  SOA  ns1.good.mail.test. admin.good.mail.test. (
+                 2026092401 ; serial
+                 3600       ; refresh
+                 900        ; retry
+                 604800     ; expire
+                 60 )       ; minimum
+
+@       IN  NS   ns1.good.mail.test.
+
+; 192.0.2.11, mail.good.mail.test. The PTR resolves and the name resolves back to this address, so
+; the round trip closes.
+11      IN  PTR  mail.good.mail.test.
+
+; 192.0.2.21, mail.weak.mail.test. The PTR points at a name that does not exist in any zone here,
+; so the forward confirmation fails. This is the common real misconfiguration: a PTR was set once
+; and the hostname was later renamed.
+21      IN  PTR  old-relay.weak.mail.test.
+
+; 192.0.2.31 has a PTR pointing at a name that DOES resolve, to a DIFFERENT address. The PTR looks
+; healthy on its own and only comparing the address back catches it, which is why an FCrDNS check
+; is three queries rather than one.
+31      IN  PTR  mail.good.mail.test.
+
+; 192.0.2.30, broken.mail.test, has no PTR at all. NXDOMAIN on the reverse lookup.

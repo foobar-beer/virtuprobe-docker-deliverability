@@ -1,0 +1,24 @@
+# ⚠️ LOAD BEARING. Do not remove, and do not "tidy" these to text=auto.
+#
+# A mail message on the wire uses CRLF, DKIM signs the body as CRLF, and a strict reading of RFC 6376
+# relaxed canonicalization splits the body on CRLF. Git's core.autocrlf=input, which is a common and
+# otherwise sensible setting, converts these files to bare LF on commit, so the bytes stored are not
+# the bytes that were signed and what a clone checks out depends on the cloner's git config.
+#
+# Measured on the first commit of this repo, which is how it was caught:
+#
+#   working copy, CRLF      body hash matches the bh= in the signature
+#   after git conversion    body hash MISMATCHES under a strict canonicalizer
+#
+# dkimpy happens to verify BOTH, because it normalizes line endings before canonicalizing, and that
+# tolerance is exactly what makes this dangerous rather than obvious. The corpus exists to be the
+# reference a verifier is measured against, and a fixture whose verdict depends on how lenient the
+# reader is cannot measure anything. A strict verifier would report a valid signature as broken and
+# the fault would look like a bug in the verifier.
+#
+# -text means git stores and checks out these bytes exactly as they are, on every platform.
+*.eml -text
+
+# The zone files and the policy file are read by servers that are relaxed about line endings, but
+# there is no reason for them to vary either.
+*.txt text eol=lf

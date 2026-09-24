@@ -9,7 +9,7 @@ cd all && docker compose up -d
 python3 tools/verify-lab.py
 ```
 
-Five containers, about a minute on a cold start. Nothing here reaches the internet and nothing needs
+Six containers, about a minute on a cold start. Nothing here reaches the internet and nothing needs
 an account anywhere.
 
 ## Why the DNS server is the point
@@ -22,6 +22,42 @@ That is what this lab is for. A chain run against `good.mail.test` must pass, an
 can only report what it found; a test with one can be wrong, which is the only way to find out
 whether it works.
 
+## Two scoring engines, and why both
+
+They answer different questions and a score from either is meaningless without naming which one.
+
+| | SpamAssassin 4.0 | Rspamd 4.2 |
+|---|---|---|
+| Protocol | SPAMC, a custom text protocol | HTTP and JSON |
+| Default threshold | 5.0 | 15.0 to reject, lower to greylist |
+| `spammy.eml` scores | 9.6, which is spam | 4.0, which is a greylist |
+| Evaluates SPF | no | yes, given the connecting IP |
+| Verifies DKIM | yes | yes |
+| Evaluates DMARC and alignment | no | yes |
+| Flags a 1024-bit key | no | no |
+
+SpamAssassin is here because it is the engine behind mail-tester and the Postmark spam check, so it is
+the scale most people's expectations are calibrated to, and "keep it under five" is advice about this
+engine whether or not anybody says so. Rspamd is here because it is where the development is and
+because it evaluates all three authentication mechanisms natively.
+
+Rspamd speaks HTTP and JSON, so a VirtuProbe chain needs no new protocol module for it: an HTTP probe
+plus `HTTP_JSON_PATH` reads the score, the action and any symbol.
+
+⚠️ **Assert on symbols, not on the score.** A forged DKIM signature barely moves either number.
+Measured on `signed-good.eml` against `signed-tampered.eml`: SpamAssassin goes from -0.1 to 0.2,
+Rspamd from -1.0 to -0.8, and Rspamd's action stays `no action` for both. A chain asserting on the
+score or the verdict passes on a message whose signature is broken. `DKIM_VALID` against
+`DKIM_INVALID`, and `R_DKIM_ALLOW` against `R_DKIM_REJECT`, are the checks that discriminate.
+
+⚠️ **Both engines have to be pointed at the fixture resolver or their authentication verdicts are
+noise that looks like a verdict.** The `all` fleet wires that in. Measured before it did: both
+messages came back `DKIM_INVALID` from SpamAssassin and `R_DKIM_PERMFAIL` from Rspamd, because
+neither could fetch the key, so a valid signature was indistinguishable from a forged one. The
+single-service compose files cannot do this, and the SpamAssassin wrapper says so on startup.
+SpamAssassin's `dns_server` also refuses a hostname and needs an IP, which is why that service has a
+startup wrapper rather than a config file.
+
 ## Ports
 
 An `11xxx` block, so this runs alongside
@@ -30,7 +66,8 @@ An `11xxx` block, so this runs alongside
 | Service | Host port | What it is |
 |---|---|---|
 | `mail-auth-dns` | `11053` udp and tcp | CoreDNS, authoritative for the fixture domains, forwarding everything else |
-| `spamd` | `11783` | SpamAssassin, for content scoring |
+| `spamd` | `11783` | SpamAssassin, for content scoring and DKIM |
+| `rspamd` | `11333` | Rspamd, which also evaluates SPF, DKIM and DMARC alignment |
 | `mailpit` | `11025` SMTP, `11080` HTTP | A sink that hands back the message exactly as it arrived |
 | `greenmail` | `11143` IMAP, `11026` SMTP | So the read-it-back-over-IMAP half of a test works locally |
 | `fixtures` | `11081` HTTP | The `.eml` corpus and the MTA-STS policy file |
@@ -106,7 +143,7 @@ verifier that returns pass unconditionally passes every other test in the corpus
 python3 tools/verify-lab.py
 ```
 
-43 checks, one per claim this README makes, and it prints the count, because "all clear" and "read
+53 checks, one per claim this README makes, and it prints the count, because "all clear" and "read
 nothing" look identical without it.
 
 Two things it handles that a hand-rolled check usually does not.
@@ -132,6 +169,22 @@ lists the bindings you configured. The fix is `docker compose up -d --force-recr
 a plain restart will not do it.
 
 Needs `dig` and `openssl`. No Python packages.
+
+### If you edit a zone or a fixture
+
+```bash
+cd all && docker compose up -d --force-recreate <service>
+```
+
+Every service mounts its content from this directory, and a bind mount is pinned to the inode the
+path had when the container was created. Anything that REPLACES a file or a directory rather than
+writing into it gives a new inode, and the running container keeps serving the old one. Editors that
+save atomically do this, and so does `git checkout`, `git rebase` and `git pull`, which is how it
+turned up here: a rebase replaced `fixtures/www` and nginx went on serving an empty directory it
+could still see at the old inode, answering 404 while the files were plainly on disk.
+
+`docker restart` does not fix it and a plain `docker compose up -d` may not either. It has to be
+`--force-recreate`.
 
 ## Three places this lab is not production
 

@@ -1,0 +1,48 @@
+; broken.mail.test
+;
+; One fault per record, each chosen so a naive check reports something plausible rather than
+; failing. The audit chains must FAIL against this domain, and each failure must name the record
+; it came from.
+;
+; Addresses come from the RFC 5737 documentation range and the domain is under .test, which
+; RFC 2606 reserves, so nothing here can route anywhere real.
+
+$ORIGIN broken.mail.test.
+$TTL 60
+
+@       IN  SOA  ns1.broken.mail.test. admin.broken.mail.test. (
+                 2026092401 ; serial
+                 3600       ; refresh
+                 900        ; retry
+                 604800     ; expire
+                 60 )       ; minimum
+
+@       IN  NS   ns1.broken.mail.test.
+ns1     IN  A    127.0.0.1
+
+@       IN  A    192.0.2.30
+
+; No MX at all, so this domain cannot receive mail. Deliberately still has an A record, because
+; some MTAs fall back to it and an audit should say so rather than reporting the domain dead.
+
+; TWO SPF records, which RFC 7208 makes a permerror rather than "the first one wins". This is the
+; fixture that catches a checker written with DNS_ANSWER_VALUE: it takes the first answer, sees a
+; syntactically fine -all record, and reports the domain correctly configured. Which of the two a
+; resolver returns first is not defined, so a checker built that way is also non deterministic.
+@       IN  TXT  "v=spf1 ip4:192.0.2.30 -all"
+@       IN  TXT  "v=spf1 include:_spf.example.net ~all"
+
+; A revoked DKIM key. The record EXISTS and parses, and p= is empty, which RFC 6376 defines as the
+; key having been withdrawn. A check that only asks whether the selector resolves reports this as
+; DKIM being configured.
+sel1._domainkey IN TXT  "v=DKIM1; k=rsa; p="
+
+; A DMARC record with two syntax errors: p= names a policy that does not exist, and rua is not a
+; URI. A receiver discards the whole record, so the effect is the same as publishing nothing, and
+; a check looking only for the string v=DMARC1 reports it as present.
+_dmarc  IN  TXT  "v=DMARC1; p=bogus; rua=dmarc@broken.mail.test"
+
+; An MTA-STS TXT record with no policy file behind it. The DNS half advertises the policy and the
+; HTTPS fetch 404s, which is worse than not publishing at all: a sending MTA that cached an earlier
+; policy keeps enforcing it and cannot refresh.
+_mta-sts        IN TXT  "v=STSv1; id=20260924000000"

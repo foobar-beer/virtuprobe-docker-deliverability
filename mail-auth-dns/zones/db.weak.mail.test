@@ -1,0 +1,57 @@
+; weak.mail.test
+;
+; Everything present and nothing enforcing. This is the state most real domains are
+; actually in, and it is the hardest case for an audit to be useful about, because a naive
+; check reports SPF, DKIM and DMARC all 'configured' and the domain is still spoofable.
+;
+; Addresses come from the RFC 5737 documentation range and the domain is under .test, which
+; RFC 2606 reserves, so nothing here can route anywhere real.
+
+$ORIGIN weak.mail.test.
+$TTL 60
+
+@       IN  SOA  ns1.weak.mail.test. admin.weak.mail.test. (
+                 2026092401 ; serial
+                 3600       ; refresh
+                 900        ; retry
+                 604800     ; expire
+                 60 )       ; minimum
+
+@       IN  NS   ns1.weak.mail.test.
+ns1     IN  A    127.0.0.1
+
+@       IN  A    192.0.2.20
+mail    IN  A    192.0.2.21
+@       IN  MX   10 mail.weak.mail.test.
+
+; SPF with ELEVEN include mechanisms. Each include costs one DNS lookup and RFC 7208 caps the
+; total at ten, so this record is a permerror that receiving MTAs treat as a failure. It is the
+; most common real defect in a working-looking SPF record, it is invisible to anyone reading the
+; record by eye, and nothing a customer already owns counts it.
+;
+; The eleven targets below all resolve. A fixture pointing at names that do not would be testing
+; error handling while appearing to test the limit.
+@       IN  TXT  "v=spf1 include:l1.weak.mail.test include:l2.weak.mail.test include:l3.weak.mail.test include:l4.weak.mail.test include:l5.weak.mail.test include:l6.weak.mail.test include:l7.weak.mail.test include:l8.weak.mail.test include:l9.weak.mail.test include:l10.weak.mail.test include:l11.weak.mail.test ~all"
+
+l1      IN  TXT  "v=spf1 ip4:192.0.2.31 -all"
+l2      IN  TXT  "v=spf1 ip4:192.0.2.32 -all"
+l3      IN  TXT  "v=spf1 ip4:192.0.2.33 -all"
+l4      IN  TXT  "v=spf1 ip4:192.0.2.34 -all"
+l5      IN  TXT  "v=spf1 ip4:192.0.2.35 -all"
+l6      IN  TXT  "v=spf1 ip4:192.0.2.36 -all"
+l7      IN  TXT  "v=spf1 ip4:192.0.2.37 -all"
+l8      IN  TXT  "v=spf1 ip4:192.0.2.38 -all"
+l9      IN  TXT  "v=spf1 ip4:192.0.2.39 -all"
+l10     IN  TXT  "v=spf1 ip4:192.0.2.40 -all"
+l11     IN  TXT  "v=spf1 ip4:192.0.2.41 -all"
+
+; DKIM present and only 1024 bit, which is below what Google recommends. It verifies, so a check
+; that only asks "does the signature validate" reports this as healthy.
+weak1._domainkey IN TXT "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQCyh2ObXVkdWLtWic3g7nsWdkhqD47vfZVcT87xgl+2uzb+soKmn/M87TKzp/baaaZQNj/ytMOJde9OYTEeCACPF8laE2Qo/3GFo0KsqihHVPIVNJORYRgSssoiCS5HzipUPZSPbF0F1GjSb06tJN0XLrMOf/Jlx0YJN85135yYtQIDAQAB"
+
+; DMARC in monitoring mode with no reporting address, which is the worst of both worlds: it
+; enforces nothing and the owner cannot see what would have been rejected. Saying "DMARC is
+; configured" about this domain is the most common false reassurance in the whole subject.
+_dmarc  IN  TXT  "v=DMARC1; p=none"
+
+; No MTA-STS and no TLS-RPT, so SMTP TLS here is opportunistic and trivially downgraded.

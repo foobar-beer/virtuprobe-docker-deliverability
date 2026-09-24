@@ -1,0 +1,34 @@
+; nospf.mail.test
+;
+; Has TXT records and none of them is SPF, which is the realistic shape of an unprotected domain
+; rather than a domain with no TXT set at all. It is also the fixture that separates "the query
+; returned nothing" from "the query returned records and none was the one we wanted", and those
+; two are the same result to a checker that reads the first answer.
+;
+; Addresses come from the RFC 5737 documentation range and the domain is under .test, which
+; RFC 2606 reserves, so nothing here can route anywhere real.
+
+$ORIGIN nospf.mail.test.
+$TTL 60
+
+@       IN  SOA  ns1.nospf.mail.test. admin.nospf.mail.test. (
+                 2026092401 ; serial
+                 3600       ; refresh
+                 900        ; retry
+                 604800     ; expire
+                 60 )       ; minimum
+
+@       IN  NS   ns1.nospf.mail.test.
+ns1     IN  A    127.0.0.1
+
+@       IN  A    192.0.2.40
+mail    IN  A    192.0.2.41
+@       IN  MX   10 mail.nospf.mail.test.
+
+; Three vendor verification tokens and no SPF. This is the ordering that breaks a first-answer
+; checker on a real domain, reproduced deliberately.
+@       IN  TXT  "google-site-verification=rX9Qz1vK3mQ8pLd2wYt7hN4bC6jF0sA1"
+@       IN  TXT  "MS=ms48271639"
+@       IN  TXT  "atlassian-domain-verification=9pQz2mKxRt4vB7nD"
+
+; No DKIM selector and no DMARC either, so this domain is spoofable by anybody.
