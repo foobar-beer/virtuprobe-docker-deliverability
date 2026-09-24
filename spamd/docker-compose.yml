@@ -4,8 +4,16 @@ services:
     image: instantlinux/spamassassin
     ports:
       - "11783:783"
+    entrypoint: ["/vp/resolve-and-start.sh"]
+    volumes:
+      - ./resolve-and-start.sh:/vp/resolve-and-start.sh:ro
     # 11783 rather than 783, so this can run alongside virtuprobe-docker/all-protocols, which
     # publishes spamd on 783. Same image, so a score from either is the same score.
+    #
+    # ⚠️ Run on its own, this container cannot see the fixture DNS zones, so its DKIM and DMARC
+    # results mean nothing: SpamAssassin cannot fetch the key, reports DKIM_INVALID, and a correctly
+    # signed message looks exactly like a tampered one. The wrapper says so on startup. For anything
+    # touching authentication, bring the lab up from all/, where the resolver is wired in.
     #
     # ⚠️ Bayes and auto-learn are left at the image defaults, which means an unprimed Bayes
     # database. That is what makes scores reproducible here: a trained Bayes drifts as it learns,

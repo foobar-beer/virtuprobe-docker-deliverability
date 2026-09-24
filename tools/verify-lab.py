@@ -33,6 +33,7 @@ MAILPIT_SMTP = ("127.0.0.1", 11025)
 MAILPIT_HTTP = "http://127.0.0.1:11080"
 GREENMAIL_IMAP = ("127.0.0.1", 11143)
 FIXTURES = "http://127.0.0.1:11081"
+RSPAMD = "http://127.0.0.1:11333"
 
 PASS, FAIL = [], []
 
@@ -241,6 +242,7 @@ def spamd_checks():
     print("\nspamd on 11783")
     corpus = "fixtures/www/messages"
 
+    check("rspamd is serving", wait_for_rspamd())
     if not check("spamd is serving", wait_for_spamd()):
         # Returning rather than pressing on, so the four content checks below are reported as NOT RUN
         # in the total instead of as four failures. Four failures reads as four defects in the corpus.
@@ -258,6 +260,87 @@ def spamd_checks():
 
     score3, mx3, rules3 = spamd_report(open(f"{corpus}/spammy.eml", "rb").read())
     check("spammy.eml scores above clean.eml", score3 > score, f"{score3} against {score}")
+
+
+# ---------------------------------------------------------------------------- authentication
+def auth_checks():
+    """
+    SPF, DKIM and DMARC evaluated against the fixture zones by two engines.
+
+    This is the section that proves the fixtures are real rather than plausible. A zone file saying
+    p=reject is a string until something reads it and acts on it.
+    """
+    print("\nauthentication, spamd on 11783 and rspamd on 11333")
+
+    good = "fixtures/www/messages/signed-good.eml"
+    bad = "fixtures/www/messages/signed-tampered.eml"
+
+    # ⚠️ Each engine has to be pointed at the fixture resolver or these verdicts are noise, and the
+    # noise LOOKS like a verdict. Measured on this lab before the resolver was wired in: both
+    # messages came back DKIM_INVALID from SpamAssassin and R_DKIM_PERMFAIL from Rspamd, because
+    # neither could fetch the key, so a valid signature and a forged one were indistinguishable.
+    _score, _mx, good_rules = spamd_report(open(good, "rb").read())
+    _score, _mx, bad_rules = spamd_report(open(bad, "rb").read())
+    check("spamd: a valid signature is DKIM_VALID", "DKIM_VALID" in good_rules, str(good_rules))
+    check("spamd: a tampered body is DKIM_INVALID",
+          "DKIM_INVALID" in bad_rules and "DKIM_VALID" not in bad_rules, str(bad_rules))
+
+    good_syms, good_score, _a = rspamd_check(good, ip="192.0.2.11", sender="orders@good.mail.test")
+    bad_syms, bad_score, _a = rspamd_check(bad, ip="192.0.2.11", sender="orders@good.mail.test")
+    check("rspamd: a valid signature is R_DKIM_ALLOW", "R_DKIM_ALLOW" in good_syms)
+    check("rspamd: a tampered body is R_DKIM_REJECT",
+          "R_DKIM_REJECT" in bad_syms and "R_DKIM_ALLOW" not in bad_syms)
+    check("rspamd: DKIM aligns with the From domain", "R_DKIM_ALIGNED" in good_syms)
+    check("rspamd: DMARC passes on the good domain", "DMARC_POLICY_ALLOW" in good_syms)
+
+    # SPF needs the connecting IP, which a file on disk does not carry. Rspamd takes it as a header,
+    # which is how a chain supplies it too.
+    allow_syms, _s, _a = rspamd_check(good, ip="192.0.2.11", sender="orders@good.mail.test")
+    fail_syms, _s, _a = rspamd_check(good, ip="198.51.100.77", sender="orders@good.mail.test")
+    check("rspamd: an authorized IP gives R_SPF_ALLOW", "R_SPF_ALLOW" in allow_syms)
+    check("rspamd: an unauthorized IP gives R_SPF_FAIL",
+          "R_SPF_FAIL" in fail_syms and "R_SPF_ALLOW" not in fail_syms)
+
+    # ⚠️ THE FINDING THAT SHAPES EVERY CHAIN WRITTEN AGAINST THIS LAB. A forged signature barely
+    # moves the score and does not change the verdict, so an assertion on either passes on a message
+    # whose DKIM is broken. Measured: spamd -0.1 against 0.2, rspamd -1.0 against -0.8, and rspamd's
+    # action stays "no action" for both. Only the SYMBOL discriminates. Assert on symbols.
+    sa_good, _mx1, _r = spamd_report(open(good, "rb").read())
+    sa_bad, _mx2, _r = spamd_report(open(bad, "rb").read())
+    check("a score cannot tell a forged signature from a valid one",
+          abs(sa_bad - sa_good) < 1.0,
+          f"spamd moved {sa_good} to {sa_bad}, which is why chains assert on symbols")
+
+
+def rspamd_check(path, ip=None, sender=None):
+    """Returns (symbol names, score, action). Rspamd speaks HTTP and JSON, so a VirtuProbe chain
+    needs no new protocol module for it: an HTTP probe plus HTTP_JSON_PATH reads all three."""
+    body = open(path, "rb").read()
+    req = urllib.request.Request(f"{RSPAMD}/checkv2", data=body, method="POST")
+    if ip:
+        req.add_header("IP", ip)
+    if sender:
+        req.add_header("From", sender)
+    with urllib.request.urlopen(req, timeout=40) as r:
+        d = json.load(r)
+    return set(d.get("symbols", {})), d.get("score"), d.get("action")
+
+
+def wait_for_rspamd(deadline_seconds=90):
+    """Same reasoning as wait_for_spamd. Rspamd also has to load its rules before it can answer."""
+    started = time.time()
+    while time.time() - started < deadline_seconds:
+        try:
+            with urllib.request.urlopen(f"{RSPAMD}/ping", timeout=5) as r:
+                if b"pong" in r.read():
+                    waited = time.time() - started
+                    if waited > 1:
+                        print(f"  (waited {waited:.1f}s for rspamd)")
+                    return True
+        except Exception:
+            pass
+        time.sleep(1)
+    return False
 
 
 # ---------------------------------------------------------------------------- HTTP fixtures
@@ -354,7 +437,7 @@ def sink_checks():
 
 def main():
     print("Verifying the deliverability lab.")
-    for fn in (dns_checks, corpus_checks, spamd_checks, fixture_checks, sink_checks):
+    for fn in (dns_checks, corpus_checks, spamd_checks, auth_checks, fixture_checks, sink_checks):
         try:
             fn()
         except Exception as e:

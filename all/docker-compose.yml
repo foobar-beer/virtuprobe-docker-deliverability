@@ -20,6 +20,21 @@ services:
     image: instantlinux/spamassassin
     ports:
       - "11783:783"
+    entrypoint: ["/vp/resolve-and-start.sh"]
+    volumes:
+      - ../spamd/resolve-and-start.sh:/vp/resolve-and-start.sh:ro
+    depends_on:
+      - mail-auth-dns
+
+  rspamd:
+    container_name: virtuprobe_deliverability_rspamd_all
+    image: rspamd/rspamd:latest
+    ports:
+      - "11333:11333"
+    volumes:
+      - ../rspamd/local.d:/etc/rspamd/local.d:ro
+    depends_on:
+      - mail-auth-dns
 
   mailpit:
     container_name: virtuprobe_deliverability_mailpit_all

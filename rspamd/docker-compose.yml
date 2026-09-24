@@ -1,0 +1,20 @@
+services:
+  rspamd:
+    container_name: virtuprobe_deliverability_rspamd_standalone
+    image: rspamd/rspamd:latest
+    ports:
+      - "11333:11333"   # normal worker, the scanning endpoint
+    volumes:
+      - ./local.d:/etc/rspamd/local.d:ro
+    # Rspamd alongside SpamAssassin rather than instead of it, because they answer different
+    # questions. SpamAssassin is what mail-tester and the Postmark spam check use, so it is the
+    # scale a customer's expectations are calibrated to. Rspamd is where the development is, and it
+    # evaluates SPF, DKIM and DMARC alignment natively, which SpamAssassin does not.
+    #
+    # ⚠️ The two scales are NOT comparable and a score is meaningless without naming the engine.
+    # Measured on this lab's spammy.eml: SpamAssassin 9.6 against a threshold of 5.0, which is spam;
+    # Rspamd 4.0 against a threshold of 15.0, which is a greylist. Any chain or document that says
+    # "keep the score under five" has to say under five on what.
+    #
+    # ⚠️ Run on its own, this container cannot see the fixture DNS zones and its authentication
+    # results mean nothing. Bring the lab up from all/ for anything touching SPF, DKIM or DMARC.
