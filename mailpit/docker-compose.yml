@@ -1,0 +1,16 @@
+services:
+  mailpit:
+    container_name: virtuprobe_deliverability_mailpit_standalone
+    image: axllent/mailpit:latest
+    ports:
+      - "11025:1025"   # SMTP
+      - "11080:8025"   # HTTP UI and API
+    environment:
+      # Accept anything. This is a sink for inspecting what we sent, not a target for testing
+      # authentication, and refusing a recipient here would only make a chain fail for a reason
+      # that has nothing to do with the message.
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+    # Mailpit rather than MailHog: it is maintained, and its API returns the message as RECEIVED,
+    # headers and raw source included, so a chain can send over SMTP and then read back the exact
+    # bytes that arrived. GET /api/v1/messages then GET /api/v1/message/{id}/raw.

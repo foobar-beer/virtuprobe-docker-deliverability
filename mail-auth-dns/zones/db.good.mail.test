@@ -1,0 +1,52 @@
+; good.mail.test
+;
+; Every authentication mechanism configured the way it should be. The audit chains must
+; PASS against this domain, and any assertion that fails here is a bug in the chain rather
+; than a finding about the zone.
+;
+; Addresses come from the RFC 5737 documentation range and the domain is under .test, which
+; RFC 2606 reserves, so nothing here can route anywhere real.
+
+$ORIGIN good.mail.test.
+$TTL 60
+
+@       IN  SOA  ns1.good.mail.test. admin.good.mail.test. (
+                 2026092401 ; serial
+                 3600       ; refresh
+                 900        ; retry
+                 604800     ; expire
+                 60 )       ; minimum
+
+@       IN  NS   ns1.good.mail.test.
+ns1     IN  A    127.0.0.1
+
+@       IN  A    192.0.2.10
+mail    IN  A    192.0.2.11
+@       IN  MX   10 mail.good.mail.test.
+
+; SPF. ip4 costs no DNS lookup, so this record is nowhere near the ten lookup limit, and it
+; ends -all, which is the only qualifier that actually tells a receiver to reject.
+@       IN  TXT  "v=spf1 ip4:192.0.2.11 -all"
+
+; DKIM, 2048 bit. Split across two character-strings because one is capped at 255 bytes and the
+; base64 of a 2048 bit SubjectPublicKeyInfo is 392. A verifier concatenates them with nothing in
+; between (RFC 6376 section 3.6.2.2); our own DnsDecoder.parseTxt does exactly that.
+sel1._domainkey IN TXT ( "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAmmyA+MJHRfHaPWgisYd1VV6KPRY3pimWaHBdb4hXi9HVbCI/T2mZmEk+kFNvNiKtG03SoKYTFAAv6KM5aZnvY3VxX9fx1kgTMrOJF7cXTaEsgN8OSonKffOIdau+SpLPacQEpM1MhyHddkFw+GZIxYTPGldhdca2lvATlvzJCF1VKVf9HopeC7POHubYLXlQL"
+                        "aPjiJI90wDytXzVV2mkWBPbgDM0rImNYgFBznK4IgKcLs6sZ/EkVClPe+dfcelQe/fjVNj0b0J0dM6R7WlMg2S2DA/6XxwIsguIxNNMgKRwkzhIen7zS4JP2uYbcs0nLap+XpX8lMHDrQZPdMj4ywIDAQAB" )
+
+; DMARC at enforcement, with a reporting address, and strict alignment on both sides.
+_dmarc  IN  TXT  "v=DMARC1; p=reject; rua=mailto:dmarc@good.mail.test; adkim=s; aspf=s"
+
+; MTA-STS and TLS reporting. The policy file itself is served by the fixtures container at
+; http://127.0.0.1:11081/.well-known/mta-sts.txt, over plain HTTP rather than HTTPS; see the
+; README, it is the one place this lab is not faithful to production.
+_mta-sts        IN TXT  "v=STSv1; id=20260924000000"
+_smtp._tls      IN TXT  "v=TLSRPTv1; rua=mailto:tlsrpt@good.mail.test"
+
+; BIMI.
+default._bimi   IN TXT  "v=BIMI1; l=https://good.mail.test/logo.svg; a="
+
+; CAA. Present for completeness, and note our DNS client cannot ask for it yet: an unsupported
+; type name currently becomes ANY (VD-646), so a CAA query against this zone returns the whole
+; RRset rather than the CAA record.
+@       IN  CAA  0 issue "letsencrypt.org"

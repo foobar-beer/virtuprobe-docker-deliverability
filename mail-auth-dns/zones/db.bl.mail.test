@@ -1,0 +1,38 @@
+; bl.mail.test
+;
+; A DNSBL fixture. A blacklist is queried by reversing the address octets and prefixing them to the
+; zone: 192.0.2.21 becomes 21.2.0.192.bl.mail.test. A name IN the zone means listed; a name absent
+; is NXDOMAIN and means clean, which is why a blacklist chain asserts expectedRcode 3 and passes
+; when the address is not on the list.
+;
+; 127.0.0.2 is the conventional answer for "listed", and the TXT carries the reason, which is what
+; the real lists do.
+
+$ORIGIN bl.mail.test.
+$TTL 60
+
+@       IN  SOA  ns1.bl.mail.test. admin.bl.mail.test. (
+                 2026092401 ; serial
+                 3600       ; refresh
+                 900        ; retry
+                 604800     ; expire
+                 60 )       ; minimum
+
+@       IN  NS   ns1.bl.mail.test.
+ns1     IN  A    127.0.0.1
+
+; 192.0.2.21, which is mail.weak.mail.test. Listed.
+21.2.0.192      IN A    127.0.0.2
+21.2.0.192      IN TXT  "Listed: spam originating from this address, see https://bl.mail.test/why"
+
+; 192.0.2.30, which is broken.mail.test. Listed for a different reason, so a chain can assert on
+; the code as well as on presence.
+30.2.0.192      IN A    127.0.0.3
+30.2.0.192      IN TXT  "Listed: open relay"
+
+; 192.0.2.11, which is mail.good.mail.test, is deliberately ABSENT. A query for it answers
+; NXDOMAIN, which is what a clean address looks like and what the chain's passing case needs.
+;
+; Not fixture-able here: SERVFAIL, which is what a retired or refusing blacklist zone answers and
+; which DNS_RCODE exists to tell apart from NXDOMAIN. CoreDNS has no way to return it for one name
+; in a zone it is authoritative for. Pointing a query at a resolver that is down produces it.

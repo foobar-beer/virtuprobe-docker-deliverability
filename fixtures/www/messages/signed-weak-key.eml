@@ -1,0 +1,22 @@
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=weak.mail.test;
+ i=@weak.mail.test; q=dns/txt; s=weak1; t=1790266026; h=from : to :
+ subject : date : message-id;
+ bh=mIrgpmXlQLESuEV2UG4m7DCGWz7r5UinCxBnVXf7rQc=;
+ b=qr96MgM9zHsUgGyvmuRwHDLz/7kcM3LW8LRHSVF01H8PojPMiWUjpRLcTd/+YGuZUwjaN
+ W8C+4YC01iDOIprjREs5N+2yvNWmdtGMGsq3hZYvt7a+XmLVmKRiCQ0Gqaatbn+V4gCTbpW
+ SCfTzcDblettfFlRVaWR2UBI56XyJqo=
+From: Orders <orders@weak.mail.test>
+To: customer@example.net
+Subject: Your order has shipped
+Date: Wed, 24 Sep 2026 09:12:04 +0200
+Message-ID: <8f3a1c7e-5b21-4d0a-9e77-2ab4c1d90f31@weak.mail.test>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hello,
+
+Your order 4471 has shipped and should arrive on Thursday.
+
+Track it here: https://good.mail.test/orders/4471
+
+To stop receiving these, use the unsubscribe link in your mail client.

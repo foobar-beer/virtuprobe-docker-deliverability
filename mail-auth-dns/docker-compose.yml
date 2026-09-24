@@ -1,0 +1,11 @@
+services:
+  mail-auth-dns:
+    container_name: virtuprobe_mail_auth_dns_standalone
+    image: coredns/coredns:latest
+    command: ["-conf", "/etc/coredns/Corefile"]
+    ports:
+      - "11053:5353/udp"
+      - "11053:5353/tcp"
+    volumes:
+      - ./Corefile:/etc/coredns/Corefile:ro
+      - ./zones:/etc/coredns/zones:ro

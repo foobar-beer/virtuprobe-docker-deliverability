@@ -1,0 +1,54 @@
+# The whole lab in one command. Ports match the per-service files exactly, so a chain written
+# against a single service keeps working here and the other way round.
+#
+#   docker compose up -d
+#
+services:
+  mail-auth-dns:
+    container_name: virtuprobe_mail_auth_dns_all
+    image: coredns/coredns:latest
+    command: ["-conf", "/etc/coredns/Corefile"]
+    ports:
+      - "11053:5353/udp"
+      - "11053:5353/tcp"
+    volumes:
+      - ../mail-auth-dns/Corefile:/etc/coredns/Corefile:ro
+      - ../mail-auth-dns/zones:/etc/coredns/zones:ro
+
+  spamd:
+    container_name: virtuprobe_deliverability_spamd_all
+    image: instantlinux/spamassassin
+    ports:
+      - "11783:783"
+
+  mailpit:
+    container_name: virtuprobe_deliverability_mailpit_all
+    image: axllent/mailpit:latest
+    ports:
+      - "11025:1025"
+      - "11080:8025"
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+  greenmail:
+    container_name: virtuprobe_deliverability_greenmail_all
+    image: greenmail/standalone:2.0.1
+    ports:
+      - "11143:3143"
+      - "11026:3025"
+    environment:
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.all
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=seed:seedpass@good.mail.test
+        -Dgreenmail.verbose
+
+  fixtures:
+    container_name: virtuprobe_deliverability_fixtures_all
+    image: nginx:alpine
+    ports:
+      - "11081:80"
+    volumes:
+      - ../fixtures/www:/usr/share/nginx/html:ro
+      - ../fixtures/nginx.conf:/etc/nginx/conf.d/default.conf:ro

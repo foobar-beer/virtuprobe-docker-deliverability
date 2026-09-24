@@ -1,0 +1,26 @@
+services:
+  greenmail:
+    container_name: virtuprobe_deliverability_greenmail_standalone
+    image: greenmail/standalone:2.0.1
+    ports:
+      - "11143:3143"   # IMAP
+      - "11026:3025"   # SMTP
+    environment:
+      # -Dgreenmail.hostname=0.0.0.0 is required or it binds loopback inside the container and the
+      # published port relays to nothing.
+      GREENMAIL_OPTS: >-
+        -Dgreenmail.setup.test.all
+        -Dgreenmail.hostname=0.0.0.0
+        -Dgreenmail.users=seed:seedpass@good.mail.test
+        -Dgreenmail.verbose
+    # Here so the read-back-over-IMAP half of a placement chain is demonstrable without a real
+    # seed mailbox.
+    #
+    # ⚠️ Two things it cannot do, and both matter before anybody reads a green run as a placement
+    # result. It has no spam filter, so nothing ever lands in a junk folder: the INBOX against junk
+    # comparison a real placement test makes has only one side here. And it writes no
+    # Authentication-Results header, because it does not evaluate SPF, DKIM or DMARC. That header
+    # is the receiving provider's own verdict and it is the thing a placement chain actually reads,
+    # so this container exercises the MECHANICS of the chain and cannot exercise its FINDING.
+    #
+    # ⚠️ GreenMail logs in on the local part only: user "seed", not "seed@good.mail.test".

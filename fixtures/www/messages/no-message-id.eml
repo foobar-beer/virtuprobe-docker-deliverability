@@ -1,0 +1,14 @@
+From: Orders <orders@good.mail.test>
+To: customer@example.net
+Subject: Your order has shipped
+Date: Wed, 24 Sep 2026 09:12:04 +0200
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hello,
+
+Your order 4471 has shipped and should arrive on Thursday.
+
+Track it here: https://good.mail.test/orders/4471
+
+To stop receiving these, use the unsubscribe link in your mail client.

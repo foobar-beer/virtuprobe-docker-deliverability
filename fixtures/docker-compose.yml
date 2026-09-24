@@ -1,0 +1,9 @@
+services:
+  fixtures:
+    container_name: virtuprobe_deliverability_fixtures_standalone
+    image: nginx:alpine
+    ports:
+      - "11081:80"
+    volumes:
+      - ./www:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro

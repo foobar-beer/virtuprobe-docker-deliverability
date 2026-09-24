@@ -1,0 +1,24 @@
+DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=good.mail.test;
+ i=@good.mail.test; q=dns/txt; s=sel1; t=1790266026; h=from : to :
+ subject : date : message-id;
+ bh=mIrgpmXlQLESuEV2UG4m7DCGWz7r5UinCxBnVXf7rQc=;
+ b=X9t+MfEslkAvsOuRdP1z6kViGEaclanF+8KRk1dtWDTK7Az161gKKGgXY0DwlGo43YGB7
+ dk0o1i/oICj8/9KXqJSaMNcp15P7BZq0SwpgDlub/rVYOP4dfbfKc/aLj1Wh3gxWEythBb9
+ LUPCPxpOwQf3AfWAnmLRy8eXFT3h96VXzp+uM/QVDR++oLUBIMtH2kOWVqg0UefVhY/ktYl
+ lUIRpzyDGfkdD+leXWuYbjYQFzep5pldNm6fAHQOmbjLMO/fW+CpXqC6oTv3jpSTvsEuZUI
+ IppnzRIGApoMz3p+xSU/Qh975JUto+UJV2EPpqipQXrOl92s/X+7TpMsbNSg==
+From: Orders <orders@good.mail.test>
+To: customer@example.net
+Subject: Your order has shipped
+Date: Wed, 24 Sep 2026 09:12:04 +0200
+Message-ID: <8f3a1c7e-5b21-4d0a-9e77-2ab4c1d90f31@good.mail.test>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+
+Hello,
+
+Your order 4471 was cancelled and should arrive on Thursday.
+
+Track it here: https://good.mail.test/orders/4471
+
+To stop receiving these, use the unsubscribe link in your mail client.
