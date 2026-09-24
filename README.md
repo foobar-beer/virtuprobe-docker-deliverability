@@ -133,6 +133,22 @@ a plain restart will not do it.
 
 Needs `dig` and `openssl`. No Python packages.
 
+### If you edit a zone or a fixture
+
+```bash
+cd all && docker compose up -d --force-recreate <service>
+```
+
+Every service mounts its content from this directory, and a bind mount is pinned to the inode the
+path had when the container was created. Anything that REPLACES a file or a directory rather than
+writing into it gives a new inode, and the running container keeps serving the old one. Editors that
+save atomically do this, and so does `git checkout`, `git rebase` and `git pull`, which is how it
+turned up here: a rebase replaced `fixtures/www` and nginx went on serving an empty directory it
+could still see at the old inode, answering 404 while the files were plainly on disk.
+
+`docker restart` does not fix it and a plain `docker compose up -d` may not either. It has to be
+`--force-recreate`.
+
 ## Three places this lab is not production
 
 Worth reading before treating a green run as a prediction.
