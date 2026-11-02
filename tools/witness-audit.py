@@ -7,7 +7,7 @@ Witness that the library's authentication audit fails each fixture domain for th
 verify-lab.py proves the lab answers what the README says. This proves the other half: that the
 "Deliverability: Authentication audit" chain from the Email Deliverability library, run in a real
 VirtuProbe against this lab, passes good.mail.test and fails every broken domain on exactly the
-assertions its fixture exists to break, and on no others.
+assertions its fixture exists to break and on no others.
 
 WHY EACH ASSERTION RUNS ON ITS OWN
 ----------------------------------
@@ -19,15 +19,15 @@ the order the chain happens to check things in.
 
 WHAT IT COMPARES AGAINST
 ------------------------
-EXPECTED below is written from the zone files, from what each fixture says it breaks, and not from
-a run. A cell that disagrees is a finding about the chain or about the lab, and the output says
+EXPECTED below is written from the zone files, from what each fixture says it breaks. It is not taken
+from a run. A cell that disagrees is a finding about the chain or about the lab. The output says
 which assertion and which domain. A slice whose failing step is a lookup rather than the assertion
 is reported as an ERROR, because "the DNS step broke" must never read as "the check failed".
 
 Every variable the chain reads is passed on the run, resolver included. The library has no way to
 ship default values with a chain, so a slice run without them would query a host literally named
 {{resolver}}, find nothing and fail every assertion, good.mail.test included. That was the first run
-of this tool, and it is the reason the all-PASS column for good.mail.test is the control to read first.
+of this tool. It is the reason the all-PASS column for good.mail.test is the control to read first.
 
 It needs the lab up (verify-lab.py first) and VirtuProbe on --api. It imports one scratch chain per
 slice and deletes it straight after, also on a failed run. Stdlib only.
@@ -50,7 +50,7 @@ SPF_EXISTS = "SPF record exists"
 SPF_ONE = "Only one SPF record, because two is a permerror"
 SPF_NOT_PLUS = "SPF is not permissive"
 SPF_ENDS = "SPF ends in a fail or softfail"
-SPF_LOOKUPS = "SPF names at most ten lookups in its top record"
+SPF_LOOKUPS = "SPF top record has at most ten DNS-lookup mechanisms"
 DMARC_EXISTS = "DMARC record exists"
 DMARC_WELL_FORMED = "DMARC record is well formed"
 DMARC_ENFORCES = "DMARC actually enforces"
@@ -84,7 +84,7 @@ EXPECTED = {
 }
 
 LIMITS = [
-    "SPF lookups nested inside an include: the chain counts the top record only, and no fixture nests past the limit.",
+    "SPF lookups nested inside an include: the chain counts the top record only. No fixture nests past the limit.",
     "MTA-STS policy fetch: broken.mail.test publishes _mta-sts with no policy file behind it; the chain checks the TXT only.",
 ]
 
@@ -132,7 +132,7 @@ def run_slice(api, name, steps, variables):
             return "ERROR", f"stopped at step {failed_at + 1} ({steps[failed_at].get('name')}), a lookup, not the assertion"
         return "FAIL", ""
     finally:
-        # History first: deleting a chain does not delete its runs, and they would otherwise sit in
+        # History first: deleting a chain does not delete its runs. They would otherwise sit in
         # the Dashboard's recent runs and pass rate under a chain that no longer exists.
         req(api, "DELETE", f"/data/chain/{cid}/history")
         req(api, "DELETE", f"/data/chain/{cid}")
@@ -175,7 +175,7 @@ def main():
     for name in names:
         row = []
         for domain, (extra, must_fail) in EXPECTED.items():
-            variables = {"resolver": "127.0.0.1", "domain": domain, **extra}
+            variables = {"resolver": "127.0.0.1", "resolver_port": "11053", "domain": domain, **extra}
             verdict, detail = run_slice(args.api, name, by_name[name], variables)
             cells += 1
             want = "FAIL" if name in must_fail else "PASS"
