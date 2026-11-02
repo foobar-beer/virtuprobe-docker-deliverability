@@ -132,6 +132,9 @@ def run_slice(api, name, steps, variables):
             return "ERROR", f"stopped at step {failed_at + 1} ({steps[failed_at].get('name')}), a lookup, not the assertion"
         return "FAIL", ""
     finally:
+        # History first: deleting a chain does not delete its runs, and they would otherwise sit in
+        # the Dashboard's recent runs and pass rate under a chain that no longer exists.
+        req(api, "DELETE", f"/data/chain/{cid}/history")
         req(api, "DELETE", f"/data/chain/{cid}")
 
 
@@ -140,6 +143,7 @@ def sweep(api):
     if status == 200 and isinstance(chains, list):
         for c in chains:
             if str(c.get("name", "")).startswith(SCRATCH_PREFIX):
+                req(api, "DELETE", f"/data/chain/{c['id']}/history")
                 req(api, "DELETE", f"/data/chain/{c['id']}")
 
 
