@@ -99,8 +99,8 @@ forward-confirmed reverse DNS check is three queries rather than one.
 
 ## Pointing VirtuProbe at it
 
-The audit chains in the **Email Deliverability** library collection default to these values, so a
-fresh import runs with nothing filled in:
+Open the **Email Deliverability** collection from the Library in VirtuProbe. A library entry cannot
+carry default values, so put these in a project environment and select it before the first run:
 
 | Variable | Value |
 |---|---|
@@ -115,6 +115,24 @@ fresh import runs with nothing filled in:
 Change `domain` to one of the broken fixtures and the same chain should fail. Change `resolver` to a
 real one and `domain` to your own, and the same chain audits production. That is the whole difference
 between the two, and it is why the resolver forwards anything it is not authoritative for.
+
+What to open, by what it answers:
+
+| Library chain | What it answers |
+|---|---|
+| Deliverability: Authentication audit | Is SPF, DMARC, DKIM, MTA-STS and MX set up the way Gmail and Yahoo require? One assertion per finding, nothing sent, the one to put in CI |
+| Deliverability: DKIM signature verification | Does a signature validate and align? Run it with `signed-good.eml` and `signed-tampered.eml` |
+| Deliverability: Content gate | Would this message pass both engines against their own thresholds? |
+| Deliverability: Forward-confirmed reverse DNS | Does the sending address have a PTR whose name resolves back to it? |
+| Deliverability: Gmail and Yahoo bulk sender checklist | The February 2024 requirements as one verdict, naming the two it cannot check |
+
+`weak.mail.test` signs with its own selector, so set `dkim_selector` to `weak1` when you audit it.
+
+To check that the audit still discriminates, run `tools/witness-audit.py` with VirtuProbe and this
+lab up. It runs each assertion of the authentication audit on its own against all five fixture
+domains and compares every verdict with what the zone files say they break, so a check that passes
+everything shows up as a wrong cell rather than as a green run. It also prints what the chain does not
+cover: an SPF lookup nested inside an include and the MTA-STS policy fetch.
 
 ## The message corpus
 
