@@ -99,22 +99,36 @@ forward-confirmed reverse DNS check is three queries rather than one.
 
 ## Pointing VirtuProbe at it
 
-The audit chains in the **Email Deliverability** library collection default to these values, so a
-fresh import runs with nothing filled in:
+Open the **Email Deliverability** collection from the Library in VirtuProbe. A library entry cannot
+carry default values, so the variables it reads go in a project environment before the first run.
+Each entry's description names the ones it reads. The
+[collection's README](https://github.com/foobar-beer/virtuprobe-library-deliverability#values-for-the-lab)
+has the value of every one of them for this lab. The DNS ones are `resolver` `127.0.0.1`,
+`resolver_port` `11053` and `domain` `good.mail.test`.
 
-| Variable | Value |
+Change `domain` to one of the broken fixtures and the same chain should fail. Point `resolver` and
+`resolver_port` at a real resolver and `domain` at your own and the same chain audits production. The
+resolver here forwards anything it is not authoritative for, which is what lets one environment reach
+both.
+
+What to open, by what it answers:
+
+| Library chain | What it answers |
 |---|---|
-| `resolver` | `127.0.0.1` |
-| `resolver_port` | `11053` |
-| `domain` | `good.mail.test` |
-| `dkim_selector` | `sel1` |
-| `spamd_host` | `127.0.0.1` |
-| `spamd_port` | `11783` |
-| `blacklist_zone` | `bl.mail.test` |
+| Deliverability: Authentication audit | Are SPF, DKIM and DMARC set up the way Gmail and Yahoo require of bulk senders? It also checks MTA-STS and MX. One assertion per finding and no mail sent, so it is the one to put in CI |
+| Deliverability: DKIM signature verification | Does a signature validate and align? Run it with `signed-good.eml` and `signed-tampered.eml` |
+| Deliverability: Content gate | Would this message pass both engines against their own thresholds? |
+| Deliverability: Forward-confirmed reverse DNS | Does the sending address have a PTR whose name resolves back to it? |
+| Deliverability: Blacklist sweep | Is the sending address on a blacklist? Its zone list is the lab's `bl.mail.test`, which lists `192.0.2.21` and `192.0.2.30` but not `192.0.2.11` |
+| Deliverability: Gmail and Yahoo bulk sender checklist | The February 2024 requirements as one verdict, naming the two it cannot check (complaint rate and inbox placement) |
 
-Change `domain` to one of the broken fixtures and the same chain should fail. Change `resolver` to a
-real one and `domain` to your own, and the same chain audits production. That is the whole difference
-between the two, and it is why the resolver forwards anything it is not authoritative for.
+`weak.mail.test` signs with its own selector, so set `dkim_selector` to `weak1` when you audit it.
+
+To check that the audit still discriminates, run `tools/witness-audit.py` with VirtuProbe and this
+lab up. It runs each assertion of the authentication audit on its own against all five fixture
+domains and compares every verdict with what the zone files say they break, so a check that passes
+everything shows up as a wrong cell rather than as a green run. It also prints what the chain does not
+cover: an SPF lookup nested inside an include and the MTA-STS policy fetch.
 
 ## The message corpus
 
